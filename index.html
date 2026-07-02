@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a2a4a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>複利試算工具</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+    background: linear-gradient(135deg, #1a2a4a 0%, #2c4a6e 100%);
+    min-height: 100vh;
+    padding: 20px;
+    color: #333;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { color: #fff; text-align: center; margin-bottom: 6px; font-size: 26px; }
+  .subtitle { color: #b8cce4; text-align: center; margin-bottom: 20px; font-size: 14px; }
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  }
+  .card h2 { font-size: 17px; color: #1a2a4a; margin-bottom: 14px; border-left: 4px solid #4a90d9; padding-left: 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 14px; }
+  .field { flex: 1; min-width: 140px; }
+  .field label { display: block; font-size: 13px; color: #555; margin-bottom: 5px; }
+  .field input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid #ccd6e4;
+    border-radius: 8px;
+    font-size: 16px;
+  }
+  .field input:focus { outline: none; border-color: #4a90d9; }
+  .hint { font-size: 12px; color: #888; margin-top: 4px; }
+  .boost-row {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    background: #f4f8fc; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;
+  }
+  .boost-row span { font-size: 14px; color: #444; }
+  .boost-row input { width: 90px; padding: 8px; border: 1.5px solid #ccd6e4; border-radius: 6px; font-size: 15px; }
+  .boost-row button {
+    margin-left: auto; background: #fbeaea; color: #c0392b; border: none;
+    border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+  }
+  .add-btn {
+    background: #eaf2fb; color: #2b6cb0; border: 1.5px dashed #4a90d9;
+    border-radius: 8px; padding: 9px 16px; cursor: pointer; font-size: 14px; width: 100%;
+  }
+  .add-btn:hover { background: #dcebfa; }
+  .results { display: flex; flex-wrap: wrap; gap: 12px; }
+  .result-box {
+    flex: 1; min-width: 150px; text-align: center;
+    border-radius: 10px; padding: 16px 10px;
+  }
+  .result-box .label { font-size: 13px; margin-bottom: 6px; }
+  .result-box .value { font-size: 24px; font-weight: bold; }
+  .box-principal { background: #eef2f7; color: #34495e; }
+  .box-total { background: #e8f5ec; color: #1e7a3c; }
+  .box-gain { background: #fdf3e3; color: #b06a10; }
+  canvas { width: 100%; height: auto; display: block; }
+  .legend { display: flex; gap: 20px; justify-content: center; margin-top: 10px; font-size: 13px; color: #555; }
+  .legend span::before { content: ""; display: inline-block; width: 22px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .lg-total::before { background: #2e9e55; }
+  .lg-principal::before { background: #8aa3bd; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 8px 6px; text-align: right; border-bottom: 1px solid #e8edf3; }
+  th { color: #1a2a4a; background: #f4f8fc; }
+  td:first-child, th:first-child { text-align: center; }
+  tr:hover td { background: #fafcff; }
+  .note { font-size: 12px; color: #999; margin-top: 14px; line-height: 1.7; }
+  @media (max-width: 600px) {
+    .result-box .value { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>💰 複利試算工具</h1>
+  <div class="subtitle">定期定額投資,幾年後會有多少?</div>
+
+  <div class="card">
+    <h2>基本設定</h2>
+    <div class="row">
+      <div class="field">
+        <label>每月投入(元)</label>
+        <input type="number" id="monthly" value="3000" min="0" step="500">
+      </div>
+      <div class="field">
+        <label>投資年數</label>
+        <input type="number" id="years" value="15" min="1" max="60">
+      </div>
+      <div class="field">
+        <label>預估年報酬率(%)</label>
+        <input type="number" id="rate" value="6" min="0" max="30" step="0.5">
+        <div class="hint">台股大型股長期平均約 6~8%</div>
+      </div>
+      <div class="field">
+        <label>一開始的單筆投入(元,可留 0)</label>
+        <input type="number" id="lump" value="0" min="0" step="10000">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>之後加碼(可加好幾筆)</h2>
+    <div id="boosts"></div>
+    <button class="add-btn" onclick="addBoost()">➕ 新增一筆加碼</button>
+  </div>
+
+  <div class="card">
+    <h2>試算結果</h2>
+    <div class="results">
+      <div class="result-box box-principal">
+        <div class="label">總共投入本金</div>
+        <div class="value" id="rPrincipal">-</div>
+      </div>
+      <div class="result-box box-total">
+        <div class="label">最後大約會有</div>
+        <div class="value" id="rTotal">-</div>
+      </div>
+      <div class="result-box box-gain">
+        <div class="label">複利幫你賺到</div>
+        <div class="value" id="rGain">-</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>成長曲線</h2>
+    <canvas id="chart" width="840" height="400"></canvas>
+    <div class="legend">
+      <span class="lg-total">資產總值</span>
+      <span class="lg-principal">投入本金</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>逐年明細</h2>
+    <div style="overflow-x:auto">
+      <table id="yearTable">
+        <thead>
+          <tr><th>第幾年</th><th>當年每月投入</th><th>累計本金</th><th>資產總值</th><th>已賺到</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="note">
+      ※ 這是用固定年報酬率的平均估算,實際市場有漲有跌,結果會上下浮動,年數愈長愈接近平均。<br>
+      ※ 報酬率參考:定存約 1.5%、債券約 3~4%、台股/美股市場型 ETF 長期約 6~8%。
+    </div>
+  </div>
+</div>
+
+<script>
+let boostId = 0;
+
+function addBoost(year, amount) {
+  boostId++;
+  const div = document.createElement("div");
+  div.className = "boost-row";
+  div.id = "boost" + boostId;
+  div.innerHTML =
+    '<span>從第</span><input type="number" class="b-year" value="' + (year || 5) + '" min="1" onchange="calc()" oninput="calc()">' +
+    '<span>年起,每月改投</span><input type="number" class="b-amt" value="' + (amount || 6000) + '" min="0" step="500" onchange="calc()" oninput="calc()">' +
+    '<span>元</span>' +
+    '<button onclick="removeBoost(' + boostId + ')">刪除</button>';
+  document.getElementById("boosts").appendChild(div);
+  calc();
+}
+
+function removeBoost(id) {
+  document.getElementById("boost" + id).remove();
+  calc();
+}
+
+function fmt(n) {
+  n = Math.round(n);
+  if (n >= 100000000) return (n / 100000000).toFixed(2) + " 億";
+  if (n >= 10000) return (n / 10000).toFixed(1) + " 萬";
+  return n.toLocaleString("zh-TW");
+}
+
+function fmtFull(n) {
+  return Math.round(n).toLocaleString("zh-TW");
+}
+
+function calc() {
+  const monthly = parseFloat(document.getElementById("monthly").value) || 0;
+  const years = Math.min(60, Math.max(1, parseInt(document.getElementById("years").value) || 1));
+  const rate = (parseFloat(document.getElementById("rate").value) || 0) / 100;
+  const lump = parseFloat(document.getElementById("lump").value) || 0;
+  const r = rate / 12;
+
+  const boosts = [];
+  document.querySelectorAll(".boost-row").forEach(row => {
+    const y = parseInt(row.querySelector(".b-year").value);
+    const a = parseFloat(row.querySelector(".b-amt").value);
+    if (y >= 1 && a >= 0) boosts.push({ year: y, amt: a });
+  });
+  boosts.sort((a, b) => a.year - b.year);
+
+  let value = lump, principal = lump;
+  const yearData = [{ year: 0, principal: principal, value: value, monthly: monthly }];
+
+  for (let m = 1; m <= years * 12; m++) {
+    const curYear = Math.ceil(m / 12);
+    let pay = monthly;
+    for (const b of boosts) if (curYear >= b.year) pay = b.amt;
+    value = value * (1 + r) + pay;
+    principal += pay;
+    if (m % 12 === 0) yearData.push({ year: curYear, principal: principal, value: value, monthly: pay });
+  }
+
+  document.getElementById("rPrincipal").textContent = fmt(principal);
+  document.getElementById("rTotal").textContent = fmt(value);
+  document.getElementById("rGain").textContent = "+" + fmt(value - principal);
+
+  const tbody = document.querySelector("#yearTable tbody");
+  tbody.innerHTML = "";
+  for (let i = 1; i < yearData.length; i++) {
+    const d = yearData[i];
+    tbody.innerHTML +=
+      "<tr><td>" + d.year + "</td><td>" + fmtFull(d.monthly) + "</td><td>" + fmtFull(d.principal) +
+      "</td><td>" + fmtFull(d.value) + "</td><td>+" + fmtFull(d.value - d.principal) + "</td></tr>";
+  }
+
+  drawChart(yearData);
+}
+
+function drawChart(data) {
+  const canvas = document.getElementById("chart");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const padL = 70, padR = 20, padT = 20, padB = 40;
+  ctx.clearRect(0, 0, W, H);
+
+  const maxVal = Math.max(...data.map(d => d.value)) * 1.08 || 1;
+  const maxYear = data.length - 1;
+  const x = yr => padL + (W - padL - padR) * yr / maxYear;
+  const y = v => H - padB - (H - padT - padB) * v / maxVal;
+
+  ctx.strokeStyle = "#e3e9f0";
+  ctx.fillStyle = "#888";
+  ctx.font = "12px Microsoft JhengHei";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const v = maxVal * i / 5;
+    ctx.beginPath();
+    ctx.moveTo(padL, y(v));
+    ctx.lineTo(W - padR, y(v));
+    ctx.stroke();
+    ctx.textAlign = "right";
+    ctx.fillText(fmt(v), padL - 8, y(v) + 4);
+  }
+  const step = maxYear <= 15 ? 1 : (maxYear <= 30 ? 2 : 5);
+  ctx.textAlign = "center";
+  for (let yr = 0; yr <= maxYear; yr += step) {
+    ctx.fillText(yr + "年", x(yr), H - padB + 20);
+  }
+
+  // 本金線
+  ctx.strokeStyle = "#8aa3bd";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  data.forEach((d, i) => i === 0 ? ctx.moveTo(x(d.year), y(d.principal)) : ctx.lineTo(x(d.year), y(d.principal)));
+  ctx.stroke();
+
+  // 總值區域
+  ctx.beginPath();
+  data.forEach((d, i) => i === 0 ? ctx.moveTo(x(d.year), y(d.value)) : ctx.lineTo(x(d.year), y(d.value)));
+  ctx.lineTo(x(maxYear), y(0));
+  ctx.lineTo(x(0), y(0));
+  ctx.closePath();
+  ctx.fillStyle = "rgba(46,158,85,0.12)";
+  ctx.fill();
+
+  // 總值線
+  ctx.strokeStyle = "#2e9e55";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  data.forEach((d, i) => i === 0 ? ctx.moveTo(x(d.year), y(d.value)) : ctx.lineTo(x(d.year), y(d.value)));
+  ctx.stroke();
+
+  // 終點標數字
+  const last = data[data.length - 1];
+  ctx.fillStyle = "#1e7a3c";
+  ctx.font = "bold 14px Microsoft JhengHei";
+  ctx.textAlign = "right";
+  ctx.fillText(fmt(last.value), x(maxYear) - 6, y(last.value) - 10);
+}
+
+document.querySelectorAll("#monthly, #years, #rate, #lump").forEach(el => {
+  el.addEventListener("input", calc);
+});
+
+addBoost(5, 6000);
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
