@@ -331,6 +331,11 @@
       </div>
       <div class="note">※ 4% 法則:每年只花總額的 4%,錢很大機率一輩子花不完(退休金要放在還會繼續生錢的地方,例如股債配置)。</div>
     </div>
+    <div class="card">
+      <h2>錢會怎麼變少</h2>
+      <canvas id="wChart" width="840" height="420"></canvas>
+      <div class="note">藍線是退休金餘額:一邊花、一邊以你設定的報酬率繼續滾。線碰到底,就是錢花完的時候。</div>
+    </div>
   </div>
 
   <!-- ============ 分頁4:方案比較 ============ -->
@@ -828,24 +833,81 @@ function calcRetire() {
   const r = rate / 100 / 12;
 
   let value = total, w = monthly0, months = 0;
+  const pts = [{ year: 0, value: total }];
   const MAX = 1200; // 100 年
   while (value > 0 && months < MAX) {
     value = value * (1 + r) - w;
     months++;
-    if (months % 12 === 0) w *= (1 + inf / 100);
+    if (months % 12 === 0) {
+      w *= (1 + inf / 100);
+      pts.push({ year: months / 12, value: Math.max(0, value) });
+    }
   }
+  if (value <= 0 && months % 12 !== 0) pts.push({ year: months / 12, value: 0 });
 
+  const forever = months >= MAX && value > 0;
   const ansEl = document.getElementById("wAnswer");
   const subEl = document.getElementById("wSub");
-  if (months >= MAX && value > 0) {
+  const yy = Math.floor(months / 12), mm = months % 12;
+  if (forever) {
     ansEl.textContent = "花不完 🎉";
     subEl.textContent = "照這樣花超過 100 年都花不完,錢生的比你花的還快";
   } else {
-    const yy = Math.floor(months / 12), mm = months % 12;
     ansEl.textContent = "可以花 " + yy + " 年" + (mm ? " " + mm + " 個月" : "");
     subEl.textContent = fmt(total) + ",每月花 " + fmtFull(monthly0) + " 元起(跟著通膨每年增加 " + inf + "%),錢同時以年報酬 " + rate + "% 繼續滾";
   }
   document.getElementById("wRule4").textContent = fmtFull(Math.round(total * 0.04 / 12 / 100) * 100) + " 元";
+
+  drawRetireChart(pts, forever, forever ? "" : "第 " + yy + " 年" + (mm ? " " + mm + " 個月" : "") + "花完");
+}
+
+function drawRetireChart(pts, forever, endLabel) {
+  const canvas = document.getElementById("wChart");
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  if (canvas.width !== 840 * dpr) { canvas.width = 840 * dpr; canvas.height = 420 * dpr; }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = 840, H = 420;
+  const padL = 78, padR = 24, padT = 34, padB = 46;
+  ctx.clearRect(0, 0, W, H);
+
+  const last = pts[pts.length - 1];
+  const maxYear = Math.max(1, last.year);
+  const maxVal = Math.max(...pts.map(d => d.value)) * 1.08 || 1;
+  const x = yr => padL + (W - padL - padR) * yr / maxYear;
+  const y = v => H - padB - (H - padT - padB) * v / maxVal;
+
+  // 格線與座標
+  ctx.strokeStyle = "#e3e9f0"; ctx.fillStyle = "#888";
+  ctx.font = "15px Microsoft JhengHei"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const v = maxVal * i / 5;
+    ctx.beginPath(); ctx.moveTo(padL, y(v)); ctx.lineTo(W - padR, y(v)); ctx.stroke();
+    ctx.textAlign = "right"; ctx.fillText(fmt(v), padL - 8, y(v) + 5);
+  }
+  const step = maxYear <= 15 ? 1 : (maxYear <= 30 ? 2 : (maxYear <= 60 ? 5 : 10));
+  ctx.textAlign = "center";
+  for (let yr = 0; yr <= maxYear; yr += step) ctx.fillText(yr + "年", x(yr), H - padB + 24);
+
+  // 餘額曲線與底下淡藍填色
+  ctx.beginPath();
+  pts.forEach((d, i) => i === 0 ? ctx.moveTo(x(d.year), y(d.value)) : ctx.lineTo(x(d.year), y(d.value)));
+  ctx.lineTo(x(last.year), y(0)); ctx.lineTo(x(0), y(0)); ctx.closePath();
+  ctx.fillStyle = "rgba(74,144,217,0.12)"; ctx.fill();
+  ctx.strokeStyle = "#4a90d9"; ctx.lineWidth = 3;
+  ctx.beginPath();
+  pts.forEach((d, i) => i === 0 ? ctx.moveTo(x(d.year), y(d.value)) : ctx.lineTo(x(d.year), y(d.value)));
+  ctx.stroke();
+
+  ctx.font = "bold 16px Microsoft JhengHei"; ctx.textAlign = "right";
+  if (forever) {
+    ctx.fillStyle = "#1e7a3c";
+    ctx.fillText("100 年後還剩 " + fmt(last.value) + ",花不完 🎉", W - padR - 6, y(last.value) - 12);
+  } else {
+    ctx.fillStyle = "#c0392b";
+    ctx.beginPath(); ctx.arc(x(last.year), y(0), 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillText(endLabel, x(last.year) - 12, y(0) - 14);
+  }
 }
 
 /* ---------- 分頁4:方案比較 ---------- */
