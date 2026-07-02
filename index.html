@@ -543,12 +543,16 @@ function calc() {
   saveState();
 }
 
+const CHART_W = 840, CHART_H = 460;
 function drawChart() {
   if (!lastChart) return;
   const { mid, low, high } = lastChart;
   const canvas = document.getElementById("chart");
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  if (canvas.width !== CHART_W * dpr) { canvas.width = CHART_W * dpr; canvas.height = CHART_H * dpr; }
   const ctx = canvas.getContext("2d");
-  const W = canvas.width, H = canvas.height;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = CHART_W, H = CHART_H;
   const padL = 78, padR = 24, padT = 24, padB = 46;
   ctx.clearRect(0, 0, W, H);
 
@@ -637,10 +641,10 @@ function drawChart() {
   function handle(e) {
     if (!lastChart) return;
     const rect = canvas.getBoundingClientRect();
-    const cx = (e.clientX - rect.left) * canvas.width / rect.width;
+    const cx = (e.clientX - rect.left) * CHART_W / rect.width;
     const padL = 78, padR = 24;
     const maxYear = lastChart.mid.length - 1;
-    let yr = Math.round((cx - padL) / (canvas.width - padL - padR) * maxYear);
+    let yr = Math.round((cx - padL) / (CHART_W - padL - padR) * maxYear);
     yr = Math.max(1, Math.min(maxYear, yr));
     hoverYear = yr;
     drawChart();
@@ -681,9 +685,14 @@ function exportImage() {
   const msTop = 762;
   const H = msTop + msItems.length * 34 + 56;
 
+  // 若圖表上還留著點選提示框,先重畫一張乾淨的
+  const hadHover = hoverYear;
+  if (hadHover !== null) { hoverYear = null; drawChart(); }
+
   const c = document.createElement("canvas");
-  c.width = W; c.height = H;
+  c.width = W * 2; c.height = H * 2;
   const ctx = c.getContext("2d");
+  ctx.scale(2, 2);
 
   ctx.fillStyle = "#f5f7fa";
   ctx.fillRect(0, 0, W, H);
@@ -738,6 +747,8 @@ function exportImage() {
   // 底部來源
   ctx.fillStyle = "#aab"; ctx.font = "14px Microsoft JhengHei"; ctx.textAlign = "center";
   ctx.fillText("用「複利試算工具」算的:belugado.github.io/compound-calc", W / 2, H - 22);
+
+  if (hadHover !== null) { hoverYear = hadHover; drawChart(); }
 
   c.toBlob(blob => {
     if (!blob) { alert("圖片產生失敗,請再試一次"); return; }
@@ -856,8 +867,11 @@ function calcCompare() {
 
   // 畫圖
   const canvas = document.getElementById("cmpChart");
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  if (canvas.width !== 840 * dpr) { canvas.width = 840 * dpr; canvas.height = 420 * dpr; }
   const ctx = canvas.getContext("2d");
-  const W = canvas.width, H = canvas.height;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = 840, H = 420;
   const padL = 78, padR = 24, padT = 24, padB = 46;
   ctx.clearRect(0, 0, W, H);
 
