@@ -46,6 +46,11 @@
     font-size: 16px;
   }
   .field input:focus { outline: none; border-color: #4a90d9; }
+  .field select {
+    width: 100%; padding: 10px 12px; border: 1.5px solid #ccd6e4; border-radius: 8px;
+    font-size: 16px; background: #fff; font-family: inherit; color: #333;
+  }
+  .field select:focus { outline: none; border-color: #4a90d9; }
   .hint { font-size: 12px; color: #888; margin-top: 4px; }
   .presets { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
   .presets button {
@@ -189,6 +194,17 @@
           <label>每月投入每年增加(%,可留 0) <span class="q" onclick="togglePop(this)">?</span></label>
           <input type="number" id="grow" value="0" min="0" max="20" step="0.5">
           <div class="pop">薪水通常愈來愈多,投入也可以跟著加。填 3 代表投入金額每年自動增加 3%:第 1 年每月投 3,000、第 2 年投 3,090…以此類推(加碼的金額也會跟著逐年增加)。</div>
+        </div>
+        <div class="field">
+          <label>複利頻率 <span class="q" onclick="togglePop(this)">?</span></label>
+          <select id="freq">
+            <option value="365">日複利(每天計息)</option>
+            <option value="12" selected>月複利(最常見)</option>
+            <option value="4">季複利(三個月一次)</option>
+            <option value="1">年複利(一年一次)</option>
+          </select>
+          <div class="hint">四個分頁都用這個設定</div>
+          <div class="pop">多久把賺到的利息滾進本金一次。滾愈頻繁,同樣的年報酬率最後會多一點點,但差距不大。台幣定存多是月複利或年複利;股票、ETF 沒有固定計息日,一般用月複利估算就好。</div>
         </div>
       </div>
     </div>
@@ -446,6 +462,17 @@ function fmt(n) {
 function fmtFull(n) { return Math.round(n).toLocaleString("zh-TW"); }
 function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
 
+// 依複利頻率(日/月/季/年計息)把年報酬率換算成等效的每月利率
+function mRate(pct) {
+  if (pct === 0) return 0;
+  const n = parseFloat(document.getElementById("freq").value) || 12;
+  return Math.pow(1 + pct / 100 / n, n / 12) - 1;
+}
+function freqName() {
+  const map = { "365": "日複利", "12": "月複利", "4": "季複利", "1": "年複利" };
+  return map[document.getElementById("freq").value] || "月複利";
+}
+
 function setRate(id, v) {
   document.getElementById(id).value = v;
   recalcAll();
@@ -457,7 +484,7 @@ function togglePop(el) {
 }
 
 /* ---------- 記住上次輸入 ---------- */
-const STATE_IDS = ["monthly","years","rate","lump","inflation","fee","grow","gTarget","gYears","gRate","gLump","gMonthly",
+const STATE_IDS = ["monthly","years","rate","lump","inflation","fee","grow","freq","gTarget","gYears","gRate","gLump","gMonthly",
                    "wTotal","wMonthly","wRate","wInflation","wYears","aMonthly","aYears","aRate","bMonthly","bYears","bRate"];
 function saveState() {
   try {
@@ -488,7 +515,7 @@ function showTab(name, btn) {
 
 // 逐月模擬:回傳每年的 {year, principal, value, monthly}
 function simulate(monthly, years, ratePct, lump, boosts, growPct) {
-  const r = ratePct / 100 / 12;
+  const r = mRate(ratePct);
   const g = (growPct || 0) / 100;
   let value = lump, principal = lump;
   const out = [{ year: 0, principal: principal, value: value, monthly: monthly }];
@@ -728,6 +755,7 @@ function buildShareURL() {
   p.set("i", num("inflation"));
   if (num("fee") > 0) p.set("f", num("fee"));
   if (num("grow") > 0) p.set("gw", num("grow"));
+  if (document.getElementById("freq").value !== "12") p.set("cf", document.getElementById("freq").value);
   const boosts = getBoosts();
   if (boosts.length) p.set("b", boosts.map(b => b.year + ":" + b.amt).join(","));
   return location.origin + location.pathname + "?" + p.toString();
@@ -785,6 +813,7 @@ function exportImage() {
   if (num("lump") > 0) cond += "、一開始單筆 " + fmtFull(num("lump")) + " 元";
   if (num("fee") > 0) cond += "、每年費用 " + num("fee") + "%";
   if (num("grow") > 0) cond += "、投入每年增加 " + num("grow") + "%";
+  if (document.getElementById("freq").value !== "12") cond += "、" + freqName();
   fit(cond, 32, 94, W - 64, 17);
   const boosts = getBoosts();
   if (boosts.length) {
@@ -856,6 +885,7 @@ function loadFromURL() {
   document.getElementById("inflation").value = p.get("i") || 2;
   document.getElementById("fee").value = p.get("f") || 0;
   document.getElementById("grow").value = p.get("gw") || 0;
+  document.getElementById("freq").value = p.get("cf") || "12";
   if (p.get("b")) {
     p.get("b").split(",").forEach(s => {
       const [y, a] = s.split(":");
@@ -872,7 +902,7 @@ function calcGoal() {
   const years = Math.min(60, Math.max(1, parseInt(document.getElementById("gYears").value) || 1));
   const rate = num("gRate");
   const lump = num("gLump");
-  const r = rate / 100 / 12;
+  const r = mRate(rate);
   const n = years * 12;
 
   const lumpGrown = lump * Math.pow(1 + r, n);
@@ -924,7 +954,7 @@ function calcRetire() {
   const monthly0 = num("wMonthly");
   const rate = num("wRate");
   const inf = num("wInflation");
-  const r = rate / 100 / 12;
+  const r = mRate(rate);
 
   let value = total, w = monthly0, months = 0;
   const pts = [{ year: 0, value: total }];
@@ -1087,6 +1117,7 @@ function calcCompare() {
 function recalcAll() { calc(); calcGoal(); calcRetire(); calcCompare(); }
 
 document.querySelectorAll("#monthly, #years, #rate, #lump, #inflation, #fee, #grow").forEach(el => el.addEventListener("input", calc));
+document.getElementById("freq").addEventListener("change", recalcAll);
 document.querySelectorAll("#gTarget, #gYears, #gRate, #gLump, #gMonthly").forEach(el => el.addEventListener("input", () => { calcGoal(); saveState(); }));
 document.querySelectorAll("#wTotal, #wMonthly, #wRate, #wInflation, #wYears").forEach(el => el.addEventListener("input", () => { calcRetire(); saveState(); }));
 document.querySelectorAll("#aMonthly, #aYears, #aRate, #bMonthly, #bYears, #bRate").forEach(el => el.addEventListener("input", () => { calcCompare(); saveState(); }));
