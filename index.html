@@ -179,6 +179,18 @@
           <div class="pop">物價每年變貴的速度。通膨 2% 代表今年 100 元買到的東西,明年要 102 元才買得到。所以未來的錢要「打折」回來看,才知道實際價值。</div>
         </div>
       </div>
+      <div class="row" style="margin-top:14px">
+        <div class="field">
+          <label>每年費用(%,可留 0) <span class="q" onclick="togglePop(this)">?</span></label>
+          <input type="number" id="fee" value="0" min="0" max="10" step="0.1">
+          <div class="pop">買基金或 ETF 每年被收的費用(內扣的經理費、保管費等)。大盤型 ETF 約 0.1~0.5%,主動式基金常見 1.5~2%。填了之後,下面「里程碑」會告訴你費用總共吃掉多少。</div>
+        </div>
+        <div class="field">
+          <label>每月投入每年增加(%,可留 0) <span class="q" onclick="togglePop(this)">?</span></label>
+          <input type="number" id="grow" value="0" min="0" max="20" step="0.5">
+          <div class="pop">薪水通常愈來愈多,投入也可以跟著加。填 3 代表投入金額每年自動增加 3%:第 1 年每月投 3,000、第 2 年投 3,090…以此類推(加碼的金額也會跟著逐年增加)。</div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -286,6 +298,20 @@
         <div class="sub" id="gSub">-</div>
       </div>
     </div>
+    <div class="card">
+      <h2>換個問法:每月投固定的錢,幾年會到?</h2>
+      <div class="row">
+        <div class="field">
+          <label>每月打算投(元)</label>
+          <input type="number" id="gMonthly" value="5000" min="0" step="500">
+          <div class="hint">目標金額、報酬率、已有單筆,用上面填的</div>
+        </div>
+      </div>
+      <div class="big-answer">
+        <div class="ans" id="gYearsAns">-</div>
+        <div class="sub" id="gYearsSub">-</div>
+      </div>
+    </div>
   </div>
 
   <!-- ============ 分頁3:退休提領 ============ -->
@@ -330,6 +356,20 @@
         </div>
       </div>
       <div class="note">※ 4% 法則:每年只花總額的 4%,錢很大機率一輩子花不完(退休金要放在還會繼續生錢的地方,例如股債配置)。</div>
+    </div>
+    <div class="card">
+      <h2>反過來問:想撐幾年,每月最多能花?</h2>
+      <div class="row">
+        <div class="field">
+          <label>想撐幾年</label>
+          <input type="number" id="wYears" value="30" min="1" max="100">
+          <div class="hint">例如 60 歲退休、抓到 90 歲,就填 30</div>
+        </div>
+      </div>
+      <div class="big-answer">
+        <div class="ans" id="wMaxAns">-</div>
+        <div class="sub" id="wMaxSub">-</div>
+      </div>
     </div>
     <div class="card">
       <h2>錢會怎麼變少</h2>
@@ -417,8 +457,8 @@ function togglePop(el) {
 }
 
 /* ---------- 記住上次輸入 ---------- */
-const STATE_IDS = ["monthly","years","rate","lump","inflation","gTarget","gYears","gRate","gLump",
-                   "wTotal","wMonthly","wRate","wInflation","aMonthly","aYears","aRate","bMonthly","bYears","bRate"];
+const STATE_IDS = ["monthly","years","rate","lump","inflation","fee","grow","gTarget","gYears","gRate","gLump","gMonthly",
+                   "wTotal","wMonthly","wRate","wInflation","wYears","aMonthly","aYears","aRate","bMonthly","bYears","bRate"];
 function saveState() {
   try {
     const s = {};
@@ -447,14 +487,16 @@ function showTab(name, btn) {
 }
 
 // 逐月模擬:回傳每年的 {year, principal, value, monthly}
-function simulate(monthly, years, ratePct, lump, boosts) {
+function simulate(monthly, years, ratePct, lump, boosts, growPct) {
   const r = ratePct / 100 / 12;
+  const g = (growPct || 0) / 100;
   let value = lump, principal = lump;
   const out = [{ year: 0, principal: principal, value: value, monthly: monthly }];
   for (let m = 1; m <= years * 12; m++) {
     const curYear = Math.ceil(m / 12);
     let pay = monthly;
     for (const b of boosts) if (curYear >= b.year) pay = b.amt;
+    if (g > 0) pay = pay * Math.pow(1 + g, curYear - 1);
     value = value * (1 + r) + pay;
     principal += pay;
     if (m % 12 === 0) out.push({ year: curYear, principal: principal, value: value, monthly: pay });
@@ -497,11 +539,14 @@ function calc() {
   const rate = num("rate");
   const lump = num("lump");
   const inf = num("inflation");
+  const fee = Math.max(0, num("fee"));
+  const grow = Math.max(0, num("grow"));
+  const netRate = Math.max(0, rate - fee);
   const boosts = getBoosts();
 
-  const mid = simulate(monthly, years, rate, lump, boosts);
-  const low = simulate(monthly, years, Math.max(0, rate - 2), lump, boosts);
-  const high = simulate(monthly, years, rate + 2, lump, boosts);
+  const mid = simulate(monthly, years, netRate, lump, boosts, grow);
+  const low = simulate(monthly, years, Math.max(0, netRate - 2), lump, boosts, grow);
+  const high = simulate(monthly, years, netRate + 2, lump, boosts, grow);
 
   const last = mid[mid.length - 1];
   lastFinalValue = last.value;
@@ -529,6 +574,20 @@ function calc() {
       const hit = mid.find(d => d.value >= t);
       ms.push(hit.year === 0 ? "💰 一開始就有 " + fmt(t) + " 了" : "💰 第 " + hit.year + " 年突破 " + fmt(t));
     }
+  }
+  if (fee > 0) {
+    const noFee = simulate(monthly, years, rate, lump, boosts, grow);
+    const feeCost = noFee[noFee.length - 1].value - last.value;
+    if (feeCost > 0) {
+      ms.push("💸 每年 " + fee + "% 的費用," + years + " 年下來吃掉約 <b>" + fmt(feeCost) + "</b>(沒這筆費用的話,最後會多這麼多)");
+    }
+  }
+  if (years >= 2) {
+    const delay = years > 6 ? 5 : 1;
+    const lateSim = simulate(monthly, years - delay, netRate, lump, boosts, grow);
+    const lateLast = lateSim[lateSim.length - 1];
+    ms.push("⏰ 一樣的投法,晚 " + delay + " 年才開始:只少投 " + fmt(last.principal - lateLast.principal) +
+            " 本金,最後卻少了 <b>" + fmt(last.value - lateLast.value) + "</b>——愈早開始,複利滾愈久");
   }
   let crossYear = null;
   for (let i = 1; i < mid.length; i++) {
@@ -667,6 +726,8 @@ function buildShareURL() {
   p.set("r", num("rate"));
   if (num("lump") > 0) p.set("l", num("lump"));
   p.set("i", num("inflation"));
+  if (num("fee") > 0) p.set("f", num("fee"));
+  if (num("grow") > 0) p.set("gw", num("grow"));
   const boosts = getBoosts();
   if (boosts.length) p.set("b", boosts.map(b => b.year + ":" + b.amt).join(","));
   return location.origin + location.pathname + "?" + p.toString();
@@ -702,6 +763,16 @@ function exportImage() {
   ctx.fillStyle = "#f5f7fa";
   ctx.fillRect(0, 0, W, H);
 
+  // 文字太長時自動縮小字級,避免超出圖片
+  const fit = (text, tx, ty, maxW, size, bold) => {
+    let s = size;
+    ctx.font = (bold ? "bold " : "") + s + "px Microsoft JhengHei";
+    while (s > 11 && ctx.measureText(text).width > maxW) {
+      s--; ctx.font = (bold ? "bold " : "") + s + "px Microsoft JhengHei";
+    }
+    ctx.fillText(text, tx, ty);
+  };
+
   // 標題與日期
   ctx.fillStyle = "#2c3e50"; ctx.font = "bold 30px Microsoft JhengHei"; ctx.textAlign = "left";
   ctx.fillText("複利試算結果", 32, 58);
@@ -709,13 +780,15 @@ function exportImage() {
   ctx.fillText(new Date().toLocaleDateString("zh-TW"), W - 32, 58);
 
   // 試算條件
-  ctx.fillStyle = "#556"; ctx.font = "17px Microsoft JhengHei"; ctx.textAlign = "left";
+  ctx.fillStyle = "#556"; ctx.textAlign = "left";
   let cond = "每月投 " + fmtFull(num("monthly")) + " 元、投 " + num("years") + " 年、年報酬 " + num("rate") + "%、通膨 " + num("inflation") + "%";
   if (num("lump") > 0) cond += "、一開始單筆 " + fmtFull(num("lump")) + " 元";
-  ctx.fillText(cond, 32, 94);
+  if (num("fee") > 0) cond += "、每年費用 " + num("fee") + "%";
+  if (num("grow") > 0) cond += "、投入每年增加 " + num("grow") + "%";
+  fit(cond, 32, 94, W - 64, 17);
   const boosts = getBoosts();
   if (boosts.length) {
-    ctx.fillText("加碼:" + boosts.map(b => "第 " + b.year + " 年起每月改投 " + fmtFull(b.amt) + " 元").join("、"), 32, 122);
+    fit("加碼:" + boosts.map(b => "第 " + b.year + " 年起每月改投 " + fmtFull(b.amt) + " 元").join("、"), 32, 122, W - 64, 17);
   }
 
   // 四個結果框
@@ -746,8 +819,8 @@ function exportImage() {
   ctx.drawImage(chart, 32, 272, cw, ch);
 
   // 里程碑
-  ctx.fillStyle = "#444"; ctx.font = "16px Microsoft JhengHei"; ctx.textAlign = "left";
-  msItems.forEach((t, i) => ctx.fillText(t, 32, msTop + i * 34));
+  ctx.fillStyle = "#444"; ctx.textAlign = "left";
+  msItems.forEach((t, i) => fit(t, 32, msTop + i * 34, W - 64, 16));
 
   // 底部來源
   ctx.fillStyle = "#aab"; ctx.font = "14px Microsoft JhengHei"; ctx.textAlign = "center";
@@ -781,6 +854,8 @@ function loadFromURL() {
   document.getElementById("rate").value = p.get("r") || 6;
   document.getElementById("lump").value = p.get("l") || 0;
   document.getElementById("inflation").value = p.get("i") || 2;
+  document.getElementById("fee").value = p.get("f") || 0;
+  document.getElementById("grow").value = p.get("gw") || 0;
   if (p.get("b")) {
     p.get("b").split(",").forEach(s => {
       const [y, a] = s.split(":");
@@ -815,6 +890,25 @@ function calcGoal() {
     const principal = pmt * n + lump;
     subEl.textContent = years + " 年總共投入約 " + fmt(principal) + " 本金,複利幫你賺 " + fmt(target - principal) +
       ",達成 " + fmt(target) + " 目標(以年報酬 " + rate + "% 估算)";
+  }
+
+  // 換個問法:固定每月投入,幾年達標
+  const pm = num("gMonthly");
+  const ans2 = document.getElementById("gYearsAns");
+  const sub2 = document.getElementById("gYearsSub");
+  let v = lump, m2 = 0;
+  const LIMIT = 1200; // 100 年
+  while (v < target && m2 < LIMIT) { v = v * (1 + r) + pm; m2++; }
+  if (m2 === 0) {
+    ans2.textContent = "已經達標了 🎉";
+    sub2.textContent = "你手上的 " + fmt(lump) + " 已經超過目標 " + fmt(target);
+  } else if (v < target) {
+    ans2.textContent = "100 年也到不了 😅";
+    sub2.textContent = "每月 " + fmtFull(pm) + " 元離目標太遠,提高金額,或用上面的問法算算每月該投多少";
+  } else {
+    const yy2 = Math.floor(m2 / 12), mm2 = m2 % 12;
+    ans2.textContent = "大約 " + yy2 + " 年" + (mm2 ? " " + mm2 + " 個月" : "");
+    sub2.textContent = "手上 " + fmt(lump) + " + 每月投 " + fmtFull(pm) + " 元、年報酬 " + rate + "%,就會存到 " + fmt(target);
   }
 }
 
@@ -857,6 +951,28 @@ function calcRetire() {
     subEl.textContent = fmt(total) + ",每月花 " + fmtFull(monthly0) + " 元起(跟著通膨每年增加 " + inf + "%),錢同時以年報酬 " + rate + "% 繼續滾";
   }
   document.getElementById("wRule4").textContent = fmtFull(Math.round(total * 0.04 / 12 / 100) * 100) + " 元";
+
+  // 反過來問:想撐 N 年,每月最多能花多少(用二分法逼近)
+  const wantYears = Math.min(100, Math.max(1, parseInt(document.getElementById("wYears").value) || 30));
+  const survive = w0 => {
+    let v2 = total, ww = w0;
+    const need = wantYears * 12;
+    for (let mo = 1; mo <= need; mo++) {
+      v2 = v2 * (1 + r) - ww;
+      if (v2 < 0) return false;
+      if (mo % 12 === 0) ww *= (1 + inf / 100);
+    }
+    return true;
+  };
+  let lo = 0, hi = Math.max(1000, total);
+  for (let i = 0; i < 40; i++) {
+    const m3 = (lo + hi) / 2;
+    if (survive(m3)) lo = m3; else hi = m3;
+  }
+  const maxW = Math.floor(lo / 100) * 100;
+  document.getElementById("wMaxAns").textContent = "每月約 " + fmtFull(maxW) + " 元";
+  document.getElementById("wMaxSub").textContent = fmt(total) + " 要撐 " + wantYears + " 年:第一年每月花 " +
+    fmtFull(maxW) + " 元,之後跟著通膨每年加 " + inf + "%,剛好夠用到最後";
 
   drawRetireChart(pts, forever, forever ? "" : "第 " + yy + " 年" + (mm ? " " + mm + " 個月" : "") + "花完");
 }
@@ -970,9 +1086,9 @@ function calcCompare() {
 /* ---------- 全部重算 ---------- */
 function recalcAll() { calc(); calcGoal(); calcRetire(); calcCompare(); }
 
-document.querySelectorAll("#monthly, #years, #rate, #lump, #inflation").forEach(el => el.addEventListener("input", calc));
-document.querySelectorAll("#gTarget, #gYears, #gRate, #gLump").forEach(el => el.addEventListener("input", () => { calcGoal(); saveState(); }));
-document.querySelectorAll("#wTotal, #wMonthly, #wRate, #wInflation").forEach(el => el.addEventListener("input", () => { calcRetire(); saveState(); }));
+document.querySelectorAll("#monthly, #years, #rate, #lump, #inflation, #fee, #grow").forEach(el => el.addEventListener("input", calc));
+document.querySelectorAll("#gTarget, #gYears, #gRate, #gLump, #gMonthly").forEach(el => el.addEventListener("input", () => { calcGoal(); saveState(); }));
+document.querySelectorAll("#wTotal, #wMonthly, #wRate, #wInflation, #wYears").forEach(el => el.addEventListener("input", () => { calcRetire(); saveState(); }));
 document.querySelectorAll("#aMonthly, #aYears, #aRate, #bMonthly, #bYears, #bRate").forEach(el => el.addEventListener("input", () => { calcCompare(); saveState(); }));
 
 // roundRect 舊瀏覽器相容
