@@ -175,6 +175,7 @@
         <div class="field">
           <label>一開始的單筆投入(元,可留 0) <span class="q" onclick="togglePop(this)">?</span></label>
           <input type="number" id="lump" value="0" min="0" step="10000">
+          <div class="hint" id="lumpWan"></div>
           <div class="pop">除了每月固定投入,一開始就先放進去的一筆錢,例如年終獎金或現有存款。愈早放進去,滾的時間愈長。</div>
         </div>
         <div class="field">
@@ -304,6 +305,7 @@
         <div class="field">
           <label>手上已有的單筆(元,可留 0)</label>
           <input type="number" id="gLump" value="0" min="0" step="10000">
+          <div class="hint" id="gLumpWan"></div>
         </div>
       </div>
     </div>
@@ -338,6 +340,7 @@
         <div class="field">
           <label>退休金總額(元)</label>
           <input type="number" id="wTotal" value="10000000" min="0" step="100000">
+          <div class="hint" id="wTotalWan"></div>
           <div class="presets">
             <button onclick="useCalcResult()">帶入「試算」分頁的結果</button>
           </div>
@@ -478,6 +481,14 @@ function setRate(id, v) {
   recalcAll();
 }
 
+// 大金額欄位下方顯示「= 幾萬」,避免數錯零
+function updateWanHints() {
+  [["lump", "lumpWan"], ["gLump", "gLumpWan"], ["wTotal", "wTotalWan"]].forEach(([id, hid]) => {
+    const v = num(id);
+    document.getElementById(hid).textContent = v >= 10000 ? "= " + fmt(v) : "";
+  });
+}
+
 function togglePop(el) {
   const pop = el.closest(".field").querySelector(".pop");
   pop.style.display = pop.style.display === "block" ? "none" : "block";
@@ -561,6 +572,7 @@ function getBoosts() {
 }
 
 function calc() {
+  updateWanHints();
   const monthly = num("monthly");
   const years = Math.min(60, Math.max(1, parseInt(document.getElementById("years").value) || 1));
   const rate = num("rate");
@@ -609,23 +621,27 @@ function calc() {
       ms.push("💸 每年 " + fee + "% 的費用," + years + " 年下來吃掉約 <b>" + fmt(feeCost) + "</b>(沒這筆費用的話,最後會多這麼多)");
     }
   }
-  if (years >= 2) {
-    const delay = years > 6 ? 5 : 1;
-    const lateSim = simulate(monthly, years - delay, netRate, lump, boosts, grow);
-    const lateLast = lateSim[lateSim.length - 1];
-    ms.push("⏰ 一樣的投法,晚 " + delay + " 年才開始:只少投 " + fmt(last.principal - lateLast.principal) +
-            " 本金,最後卻少了 <b>" + fmt(last.value - lateLast.value) + "</b>——愈早開始,複利滾愈久");
-  }
-  let crossYear = null;
-  for (let i = 1; i < mid.length; i++) {
-    const contrib = mid[i].principal - mid[i - 1].principal;
-    const interest = mid[i].value - mid[i - 1].value - contrib;
-    if (interest > contrib) { crossYear = mid[i].year; break; }
-  }
-  if (crossYear) {
-    ms.push("🚀 <b>第 " + crossYear + " 年黃金交叉</b>:從這年起,錢自己賺的比你投入的還多,之後會愈滾愈快");
+  if (last.principal > 0) {
+    if (years >= 2) {
+      const delay = years > 6 ? 5 : 1;
+      const lateSim = simulate(monthly, years - delay, netRate, lump, boosts, grow);
+      const lateLast = lateSim[lateSim.length - 1];
+      ms.push("⏰ 一樣的投法,晚 " + delay + " 年才開始:只少投 " + fmt(last.principal - lateLast.principal) +
+              " 本金,最後卻少了 <b>" + fmt(last.value - lateLast.value) + "</b>——愈早開始,複利滾愈久");
+    }
+    let crossYear = null;
+    for (let i = 1; i < mid.length; i++) {
+      const contrib = mid[i].principal - mid[i - 1].principal;
+      const interest = mid[i].value - mid[i - 1].value - contrib;
+      if (interest > contrib) { crossYear = mid[i].year; break; }
+    }
+    if (crossYear) {
+      ms.push("🚀 <b>第 " + crossYear + " 年黃金交叉</b>:從這年起,錢自己賺的比你投入的還多,之後會愈滾愈快");
+    } else {
+      ms.push("⏳ " + years + " 年內還沒出現「黃金交叉」(錢自己賺的超過你投入的那一年)——年數拉長或報酬率高一點就會出現");
+    }
   } else {
-    ms.push("⏳ " + years + " 年內還沒出現「黃金交叉」(錢自己賺的超過你投入的那一年)——年數拉長或報酬率高一點就會出現");
+    ms.push("填了投入金額,這裡會告訴你什麼時候突破 100 萬、什麼時候出現黃金交叉");
   }
   document.getElementById("milestones").innerHTML = ms.map(t => "<li>" + t + "</li>").join("");
 
@@ -898,6 +914,7 @@ function loadFromURL() {
 
 /* ---------- 分頁2:目標反推 ---------- */
 function calcGoal() {
+  updateWanHints();
   const target = num("gTarget") * 10000;
   const years = Math.min(60, Math.max(1, parseInt(document.getElementById("gYears").value) || 1));
   const rate = num("gRate");
@@ -912,6 +929,13 @@ function calcGoal() {
 
   const ansEl = document.getElementById("gAnswer");
   const subEl = document.getElementById("gSub");
+  if (target <= 0) {
+    ansEl.textContent = "先填目標金額";
+    subEl.textContent = "在上面「目標金額」填你想存到的數字,例如 200(萬元)";
+    document.getElementById("gYearsAns").textContent = "-";
+    document.getElementById("gYearsSub").textContent = "";
+    return;
+  }
   if (pmt <= 0) {
     ansEl.textContent = "不用再投了 🎉";
     subEl.textContent = "你手上的 " + fmt(lump) + " 放著滾 " + years + " 年就會變 " + fmt(lumpGrown) + ",已經超過目標";
@@ -950,11 +974,23 @@ function useCalcResult() {
   }
 }
 function calcRetire() {
+  updateWanHints();
   const total = num("wTotal");
   const monthly0 = num("wMonthly");
   const rate = num("wRate");
   const inf = num("wInflation");
   const r = mRate(rate);
+
+  if (total <= 0) {
+    document.getElementById("wAnswer").textContent = "先填退休金總額";
+    document.getElementById("wSub").textContent = "在上面填退休時會有的錢,或按「帶入試算分頁的結果」";
+    document.getElementById("wRule4").textContent = "-";
+    document.getElementById("wMaxAns").textContent = "-";
+    document.getElementById("wMaxSub").textContent = "";
+    const wc = document.getElementById("wChart");
+    wc.getContext("2d").clearRect(0, 0, wc.width, wc.height);
+    return;
+  }
 
   let value = total, w = monthly0, months = 0;
   const pts = [{ year: 0, value: total }];
@@ -1121,6 +1157,18 @@ document.getElementById("freq").addEventListener("change", recalcAll);
 document.querySelectorAll("#gTarget, #gYears, #gRate, #gLump, #gMonthly").forEach(el => el.addEventListener("input", () => { calcGoal(); saveState(); }));
 document.querySelectorAll("#wTotal, #wMonthly, #wRate, #wInflation, #wYears").forEach(el => el.addEventListener("input", () => { calcRetire(); saveState(); }));
 document.querySelectorAll("#aMonthly, #aYears, #aRate, #bMonthly, #bYears, #bRate").forEach(el => el.addEventListener("input", () => { calcCompare(); saveState(); }));
+
+// 填超過範圍的數字時,自動改回上限/下限並重算,避免「欄位顯示 100 年、其實用 60 年算」的落差
+document.querySelectorAll('input[type="number"]').forEach(el => {
+  el.addEventListener("change", () => {
+    const v = parseFloat(el.value);
+    if (isNaN(v)) return;
+    let fixed = v;
+    if (el.max !== "" && v > parseFloat(el.max)) fixed = parseFloat(el.max);
+    if (el.min !== "" && v < parseFloat(el.min)) fixed = parseFloat(el.min);
+    if (fixed !== v) { el.value = fixed; recalcAll(); saveState(); }
+  });
+});
 
 // roundRect 舊瀏覽器相容
 if (!CanvasRenderingContext2D.prototype.roundRect) {
