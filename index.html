@@ -73,6 +73,20 @@
     padding: 12px 20px; cursor: pointer; font-size: 15px; width: 100%; font-family: inherit;
   }
   .share-btn:hover { background: #268a49; }
+  .img-btn { background: #4a90d9; }
+  .img-btn:hover { background: #3d7dc0; }
+  .q {
+    display: inline-block; width: 17px; height: 17px; line-height: 17px; text-align: center;
+    background: #4a90d9; color: #fff; border-radius: 50%; font-size: 11px; cursor: pointer;
+    margin-left: 4px; vertical-align: middle; user-select: none;
+  }
+  .pop {
+    display: none; background: #f4f8fc; border: 1px solid #cfe0f2; border-radius: 8px;
+    padding: 8px 10px; font-size: 12.5px; color: #456; margin-top: 6px; line-height: 1.6;
+  }
+  .milestones { list-style: none; }
+  .milestones li { padding: 9px 4px; border-bottom: 1px dashed #e3eaf2; font-size: 14.5px; color: #444; line-height: 1.6; }
+  .milestones li:last-child { border-bottom: none; }
   .results { display: flex; flex-wrap: wrap; gap: 12px; }
   .result-box {
     flex: 1; min-width: 140px; text-align: center;
@@ -142,24 +156,27 @@
           <input type="number" id="years" value="15" min="1" max="60">
         </div>
         <div class="field">
-          <label>預估年報酬率(%)</label>
+          <label>預估年報酬率(%) <span class="q" onclick="togglePop(this)">?</span></label>
           <input type="number" id="rate" value="6" min="0" max="30" step="0.5">
           <div class="presets">
             <button onclick="setRate('rate',1.5)">定存 1.5%</button>
             <button onclick="setRate('rate',4)">債券 4%</button>
             <button onclick="setRate('rate',7)">市場型ETF 7%</button>
           </div>
+          <div class="pop">你投的東西平均一年幫你賺幾 %。定存約 1.5%、債券約 4%、台股美股大盤型 ETF(如 0050、009816)長期平均約 6~8%。數字愈高,通常上下起伏也愈大。</div>
         </div>
       </div>
       <div class="row" style="margin-top:14px">
         <div class="field">
-          <label>一開始的單筆投入(元,可留 0)</label>
+          <label>一開始的單筆投入(元,可留 0) <span class="q" onclick="togglePop(this)">?</span></label>
           <input type="number" id="lump" value="0" min="0" step="10000">
+          <div class="pop">除了每月固定投入,一開始就先放進去的一筆錢,例如年終獎金或現有存款。愈早放進去,滾的時間愈長。</div>
         </div>
         <div class="field">
-          <label>通膨率(%)</label>
+          <label>通膨率(%) <span class="q" onclick="togglePop(this)">?</span></label>
           <input type="number" id="inflation" value="2" min="0" max="10" step="0.5">
           <div class="hint">台灣長期通膨大約 2%</div>
+          <div class="pop">物價每年變貴的速度。通膨 2% 代表今年 100 元買到的東西,明年要 102 元才買得到。所以未來的錢要「打折」回來看,才知道實際價值。</div>
         </div>
       </div>
     </div>
@@ -204,8 +221,16 @@
     </div>
 
     <div class="card">
-      <button class="share-btn" onclick="shareResult()">📤 分享我的試算給朋友</button>
-      <div class="note" style="text-align:center">會產生一個網址,朋友點開直接看到你填的數字和結果</div>
+      <h2>里程碑</h2>
+      <ul class="milestones" id="milestones"></ul>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button class="share-btn" style="flex:1;min-width:160px" onclick="shareResult()">📤 分享連結</button>
+        <button class="share-btn img-btn" style="flex:1;min-width:160px" onclick="exportImage()">🖼 存成圖片</button>
+      </div>
+      <div class="note" style="text-align:center">分享連結:朋友點開直接看到你的試算|存成圖片:變成一張圖,方便傳 LINE 或留存</div>
     </div>
 
     <div class="card">
@@ -239,13 +264,14 @@
           <input type="number" id="gYears" value="15" min="1" max="60">
         </div>
         <div class="field">
-          <label>預估年報酬率(%)</label>
+          <label>預估年報酬率(%) <span class="q" onclick="togglePop(this)">?</span></label>
           <input type="number" id="gRate" value="6" min="0" max="30" step="0.5">
           <div class="presets">
             <button onclick="setRate('gRate',1.5)">定存 1.5%</button>
             <button onclick="setRate('gRate',4)">債券 4%</button>
             <button onclick="setRate('gRate',7)">市場型ETF 7%</button>
           </div>
+          <div class="pop">你投的東西平均一年幫你賺幾 %。定存約 1.5%、債券約 4%、台股美股大盤型 ETF 長期平均約 6~8%。</div>
         </div>
         <div class="field">
           <label>手上已有的單筆(元,可留 0)</label>
@@ -279,9 +305,10 @@
           <input type="number" id="wMonthly" value="30000" min="1000" step="1000">
         </div>
         <div class="field">
-          <label>退休後年報酬率(%)</label>
+          <label>退休後年報酬率(%) <span class="q" onclick="togglePop(this)">?</span></label>
           <input type="number" id="wRate" value="3" min="0" max="15" step="0.5">
           <div class="hint">退休後通常放保守一點,約 3~4%</div>
+          <div class="pop">退休後的錢不能大起大落,通常會放保守一點的組合(債券多、股票少),所以報酬率抓 3~4% 比較實際。</div>
         </div>
         <div class="field">
           <label>通膨率(%)</label>
@@ -379,6 +406,32 @@ function setRate(id, v) {
   recalcAll();
 }
 
+function togglePop(el) {
+  const pop = el.closest(".field").querySelector(".pop");
+  pop.style.display = pop.style.display === "block" ? "none" : "block";
+}
+
+/* ---------- 記住上次輸入 ---------- */
+const STATE_IDS = ["monthly","years","rate","lump","inflation","gTarget","gYears","gRate","gLump",
+                   "wTotal","wMonthly","wRate","wInflation","aMonthly","aYears","aRate","bMonthly","bYears","bRate"];
+function saveState() {
+  try {
+    const s = {};
+    STATE_IDS.forEach(id => s[id] = document.getElementById(id).value);
+    s.boosts = getBoosts();
+    localStorage.setItem("fuli-state", JSON.stringify(s));
+  } catch (e) {}
+}
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem("fuli-state"));
+    if (!s) return false;
+    STATE_IDS.forEach(id => { if (s[id] !== undefined) document.getElementById(id).value = s[id]; });
+    if (s.boosts && s.boosts.length) s.boosts.forEach(b => addBoost(b.year, b.amt));
+    return true;
+  } catch (e) { return false; }
+}
+
 function showTab(name, btn) {
   ["calc","goal","retire","compare"].forEach(t => {
     document.getElementById("tab-" + t).style.display = (t === name) ? "" : "none";
@@ -463,8 +516,31 @@ function calc() {
       "</td><td>" + fmtFull(d.value) + "</td><td>+" + fmtFull(d.value - d.principal) + "</td></tr>";
   }
 
+  // 里程碑
+  const ms = [];
+  const TH = [100000, 500000, 1000000, 2000000, 5000000, 10000000, 50000000, 100000000];
+  for (const t of TH) {
+    if (last.value >= t) {
+      const hit = mid.find(d => d.value >= t);
+      ms.push(hit.year === 0 ? "💰 一開始就有 " + fmt(t) + " 了" : "💰 第 " + hit.year + " 年突破 " + fmt(t));
+    }
+  }
+  let crossYear = null;
+  for (let i = 1; i < mid.length; i++) {
+    const contrib = mid[i].principal - mid[i - 1].principal;
+    const interest = mid[i].value - mid[i - 1].value - contrib;
+    if (interest > contrib) { crossYear = mid[i].year; break; }
+  }
+  if (crossYear) {
+    ms.push("🚀 <b>第 " + crossYear + " 年黃金交叉</b>:從這年起,錢自己賺的比你投入的還多,之後會愈滾愈快");
+  } else {
+    ms.push("⏳ " + years + " 年內還沒出現「黃金交叉」(錢自己賺的超過你投入的那一年)——年數拉長或報酬率高一點就會出現");
+  }
+  document.getElementById("milestones").innerHTML = ms.map(t => "<li>" + t + "</li>").join("");
+
   lastChart = { mid: mid, low: low, high: high };
   drawChart();
+  saveState();
 }
 
 function drawChart() {
@@ -599,9 +675,91 @@ function shareResult() {
     );
   }
 }
+function exportImage() {
+  const msItems = Array.from(document.querySelectorAll("#milestones li")).map(li => li.textContent).slice(-4);
+  const W = 880;
+  const msTop = 762;
+  const H = msTop + msItems.length * 34 + 56;
+
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d");
+
+  ctx.fillStyle = "#f5f7fa";
+  ctx.fillRect(0, 0, W, H);
+
+  // 標題與日期
+  ctx.fillStyle = "#2c3e50"; ctx.font = "bold 30px Microsoft JhengHei"; ctx.textAlign = "left";
+  ctx.fillText("複利試算結果", 32, 58);
+  ctx.fillStyle = "#999"; ctx.font = "15px Microsoft JhengHei"; ctx.textAlign = "right";
+  ctx.fillText(new Date().toLocaleDateString("zh-TW"), W - 32, 58);
+
+  // 試算條件
+  ctx.fillStyle = "#556"; ctx.font = "17px Microsoft JhengHei"; ctx.textAlign = "left";
+  let cond = "每月投 " + fmtFull(num("monthly")) + " 元、投 " + num("years") + " 年、年報酬 " + num("rate") + "%、通膨 " + num("inflation") + "%";
+  if (num("lump") > 0) cond += "、一開始單筆 " + fmtFull(num("lump")) + " 元";
+  ctx.fillText(cond, 32, 94);
+  const boosts = getBoosts();
+  if (boosts.length) {
+    ctx.fillText("加碼:" + boosts.map(b => "第 " + b.year + " 年起每月改投 " + fmtFull(b.amt) + " 元").join("、"), 32, 122);
+  }
+
+  // 四個結果框
+  const boxes = [
+    { label: "總共投入本金", v: document.getElementById("rPrincipal").textContent, bg: "#eef2f7", fg: "#34495e" },
+    { label: "最後大約會有", v: document.getElementById("rTotal").textContent, bg: "#e8f5ec", fg: "#1e7a3c" },
+    { label: "複利幫你賺到", v: document.getElementById("rGain").textContent, bg: "#fdf3e3", fg: "#b06a10" },
+    { label: "換算成現在的購買力", v: document.getElementById("rReal").textContent, bg: "#f0eaf8", fg: "#6b3fa0" }
+  ];
+  const bw = (W - 64 - 3 * 12) / 4, by = 146, bh = 88;
+  ctx.textAlign = "center";
+  boxes.forEach((b, i) => {
+    const bx = 32 + i * (bw + 12);
+    ctx.fillStyle = b.bg;
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 10); ctx.fill();
+    ctx.fillStyle = b.fg;
+    ctx.font = "13px Microsoft JhengHei";
+    ctx.fillText(b.label, bx + bw / 2, by + 28);
+    ctx.font = "bold 21px Microsoft JhengHei";
+    ctx.fillText(b.v, bx + bw / 2, by + 64);
+  });
+
+  // 成長曲線(直接拷主圖)
+  const chart = document.getElementById("chart");
+  const cw = W - 64, ch = cw * chart.height / chart.width;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.roundRect(20, 258, W - 40, ch + 28, 12); ctx.fill();
+  ctx.drawImage(chart, 32, 272, cw, ch);
+
+  // 里程碑
+  ctx.fillStyle = "#444"; ctx.font = "16px Microsoft JhengHei"; ctx.textAlign = "left";
+  msItems.forEach((t, i) => ctx.fillText(t, 32, msTop + i * 34));
+
+  // 底部來源
+  ctx.fillStyle = "#aab"; ctx.font = "14px Microsoft JhengHei"; ctx.textAlign = "center";
+  ctx.fillText("用「複利試算工具」算的:belugado.github.io/compound-calc", W / 2, H - 22);
+
+  c.toBlob(blob => {
+    if (!blob) { alert("圖片產生失敗,請再試一次"); return; }
+    const file = new File([blob], "複利試算.png", { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: "複利試算結果" }).catch(() => {});
+    } else {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "複利試算.png";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+  }, "image/png");
+}
+
 function loadFromURL() {
   const p = new URLSearchParams(location.search);
-  if (!p.has("m")) { addBoost(5, 6000); return; }
+  if (!p.has("m")) {
+    if (loadState()) { calc(); return; }
+    addBoost(5, 6000); return;
+  }
   document.getElementById("monthly").value = p.get("m");
   document.getElementById("years").value = p.get("y") || 15;
   document.getElementById("rate").value = p.get("r") || 6;
@@ -737,9 +895,9 @@ function calcCompare() {
 function recalcAll() { calc(); calcGoal(); calcRetire(); calcCompare(); }
 
 document.querySelectorAll("#monthly, #years, #rate, #lump, #inflation").forEach(el => el.addEventListener("input", calc));
-document.querySelectorAll("#gTarget, #gYears, #gRate, #gLump").forEach(el => el.addEventListener("input", calcGoal));
-document.querySelectorAll("#wTotal, #wMonthly, #wRate, #wInflation").forEach(el => el.addEventListener("input", calcRetire));
-document.querySelectorAll("#aMonthly, #aYears, #aRate, #bMonthly, #bYears, #bRate").forEach(el => el.addEventListener("input", calcCompare));
+document.querySelectorAll("#gTarget, #gYears, #gRate, #gLump").forEach(el => el.addEventListener("input", () => { calcGoal(); saveState(); }));
+document.querySelectorAll("#wTotal, #wMonthly, #wRate, #wInflation").forEach(el => el.addEventListener("input", () => { calcRetire(); saveState(); }));
+document.querySelectorAll("#aMonthly, #aYears, #aRate, #bMonthly, #bYears, #bRate").forEach(el => el.addEventListener("input", () => { calcCompare(); saveState(); }));
 
 // roundRect 舊瀏覽器相容
 if (!CanvasRenderingContext2D.prototype.roundRect) {
